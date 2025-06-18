@@ -30,9 +30,7 @@ const App: React.FC = () => {
           {CONTENT_MAP[selected] ?? DEFAULT_CONTENT}
         </ContentWindow>
       </div>
-      <StatusBar>
-        <StatusBarManager />
-      </StatusBar>
+      <StatusBar />
     </div>
   );
 };
