@@ -23,8 +23,6 @@ pub enum DockerError {
     ConnectionLost,
     #[error("Docker is restarting")]
     Restarting,
-    #[error("Docker is paused")]
-    Paused,
     #[error("Failed to connect to Docker: {0}")]
     ConnectionFailed(String),
 }
@@ -32,7 +30,6 @@ pub enum DockerError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DockerStatus {
     is_running: bool,
-    is_paused: bool,
     engine_version: Option<DockerVersion>,
     desktop_version: Option<String>,
     engine_update_available: Option<bool>,
@@ -104,7 +101,6 @@ impl DockerState {
             docker: None,
             status: DockerStatus {
                 is_running: false,
-                is_paused: false,
                 engine_version: None,
                 desktop_version: None,
                 engine_update_available: None,
@@ -440,6 +436,9 @@ async fn docker_monitoring_loop(state: Arc<Mutex<DockerState>>, app_handle: taur
     let mut health_check_interval = tokio::time::interval(config.health_check_interval);
     let mut update_check_interval = tokio::time::interval(config.update_check_interval);
 
+    // Add a small delay before starting health checks to prevent race conditions
+    tokio::time::sleep(Duration::from_millis(2000)).await;
+
     loop {
         tokio::select! {
             _ = retry_interval.tick() => {
@@ -472,7 +471,6 @@ async fn docker_monitoring_loop(state: Arc<Mutex<DockerState>>, app_handle: taur
                             DockerError::Timeout => "Docker connection timeout",
                             DockerError::ConnectionLost => "Docker connection lost",
                             DockerError::Restarting => "Docker is restarting",
-                            DockerError::Paused => "Docker is paused",
                             DockerError::ConnectionFailed(_msg) => {
                                 "Docker connection failed"
                             }
@@ -483,7 +481,6 @@ async fn docker_monitoring_loop(state: Arc<Mutex<DockerState>>, app_handle: taur
                             let mut state_guard = state.lock().unwrap();
                             state_guard.status.error = Some(error_message.to_string());
                             state_guard.status.is_running = false;
-                            state_guard.status.is_paused = false;
                             state_guard.status.engine_version = None;
                             state_guard.status.desktop_version = None;
                             state_guard.status.engine_update_available = None;
@@ -570,18 +567,6 @@ async fn try_connect_docker(
 
     let desktop_version = get_docker_desktop_version();
 
-    // Check if Docker is paused
-    let is_paused = match tokio::time::timeout(config.connection_timeout, docker.info()).await {
-        Ok(Ok(_)) => false,
-        Ok(Err(e)) => {
-            let error_msg = e.to_string().to_lowercase();
-            error_msg.contains("paused")
-                || error_msg.contains("engine")
-                || error_msg.contains("unavailable")
-        }
-        Err(_) => true,
-    };
-
     // Get container count efficiently
     let container_count = tokio::time::timeout(
         config.connection_timeout,
@@ -639,7 +624,6 @@ async fn try_connect_docker(
         state_guard.docker = Some(docker);
         state_guard.status = DockerStatus {
             is_running: true,
-            is_paused,
             engine_version: Some(engine_version),
             desktop_version,
             engine_update_available: None, // Will be updated by async task
@@ -684,12 +668,11 @@ async fn start_event_monitoring(
                     let mut state_guard = state.lock().unwrap();
                     state_guard.status = DockerStatus {
                         is_running: false,
-                        is_paused: false,
                         engine_version: None,
                         desktop_version: None,
                         engine_update_available: None,
                         desktop_update_available: None,
-                        error: Some("Docker restarting...".to_string()),
+                        error: Some("Initializing...".to_string()),
                         container_count: None,
                         last_checked: Some(chrono::Utc::now().to_rfc3339()),
                     };
@@ -723,19 +706,6 @@ async fn perform_health_check(
     // Check if Docker is responsive
     match tokio::time::timeout(config.connection_timeout, docker.ping()).await {
         Ok(Ok(_)) => {
-            // Docker is responsive, check if it's paused
-            let is_paused =
-                match tokio::time::timeout(config.connection_timeout, docker.info()).await {
-                    Ok(Ok(_)) => false,
-                    Ok(Err(e)) => {
-                        let error_msg = e.to_string().to_lowercase();
-                        error_msg.contains("paused")
-                            || error_msg.contains("engine")
-                            || error_msg.contains("unavailable")
-                    }
-                    Err(_) => true,
-                };
-
             // Get container count efficiently
             let container_count = tokio::time::timeout(
                 config.connection_timeout,
@@ -749,50 +719,42 @@ async fn perform_health_check(
             .and_then(|result| result.ok())
             .map(|containers| containers.len() as i32);
 
-            // Update status
+            // Update only container count and timestamp, preserve other status
             {
                 let mut state_guard = state.lock().unwrap();
                 state_guard.status.container_count = container_count;
-                state_guard.status.is_paused = is_paused;
                 state_guard.status.last_checked = Some(chrono::Utc::now().to_rfc3339());
+                // Ensure running status is maintained
+                state_guard.status.is_running = true;
+                state_guard.status.error = None;
             }
             notify_status_update(app_handle, state).await;
             Ok(())
         }
         Ok(Err(_)) => {
-            // Docker is not responding
+            // Docker is not responding - only update if we were previously running
             {
                 let mut state_guard = state.lock().unwrap();
-                state_guard.status = DockerStatus {
-                    is_running: false,
-                    is_paused: false,
-                    engine_version: None,
-                    desktop_version: None,
-                    engine_update_available: None,
-                    desktop_update_available: None,
-                    error: Some("Docker is not responding".to_string()),
-                    container_count: None,
-                    last_checked: Some(chrono::Utc::now().to_rfc3339()),
-                };
+                if state_guard.status.is_running {
+                    state_guard.status.is_running = false;
+                    state_guard.status.error = Some("Docker is not responding".to_string());
+                    state_guard.status.container_count = None;
+                    state_guard.status.last_checked = Some(chrono::Utc::now().to_rfc3339());
+                }
             }
             notify_status_update(app_handle, state).await;
             Err(DockerError::ConnectionLost)
         }
         Err(_) => {
-            // Timeout occurred
+            // Timeout occurred - only update if we were previously running
             {
                 let mut state_guard = state.lock().unwrap();
-                state_guard.status = DockerStatus {
-                    is_running: false,
-                    is_paused: false,
-                    engine_version: None,
-                    desktop_version: None,
-                    engine_update_available: None,
-                    desktop_update_available: None,
-                    error: Some("Docker connection timeout".to_string()),
-                    container_count: None,
-                    last_checked: Some(chrono::Utc::now().to_rfc3339()),
-                };
+                if state_guard.status.is_running {
+                    state_guard.status.is_running = false;
+                    state_guard.status.error = Some("Docker connection timeout".to_string());
+                    state_guard.status.container_count = None;
+                    state_guard.status.last_checked = Some(chrono::Utc::now().to_rfc3339());
+                }
             }
             notify_status_update(app_handle, state).await;
             Err(DockerError::Timeout)

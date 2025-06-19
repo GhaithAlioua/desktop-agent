@@ -12,7 +12,6 @@ interface DockerVersion {
 
 interface DockerStatus {
   is_running: boolean;
-  is_paused: boolean;
   engine_version: DockerVersion | null;
   desktop_version: string | null;
   engine_update_available: boolean | null;
@@ -25,7 +24,6 @@ interface DockerStatus {
 const DockerStatus: React.FC = () => {
   const [status, setStatus] = useState<DockerStatus>({
     is_running: false,
-    is_paused: false,
     engine_version: null,
     desktop_version: null,
     engine_update_available: null,
@@ -74,7 +72,6 @@ const DockerStatus: React.FC = () => {
       return "bg-gray-400"; // Grey for checking state
     }
     if (status.error && !status.is_running) return "bg-red-500";
-    if (status.is_paused) return "bg-yellow-500";
     if (status.is_running) return "bg-green-500";
     return "bg-gray-400"; // Default to grey for checking state
   };
@@ -88,7 +85,6 @@ const DockerStatus: React.FC = () => {
       return "Restarting...";
     }
     if (status.error && !status.is_running) return "Not Running";
-    if (status.is_paused) return "Paused";
     if (status.is_running) return "Running";
     return "Checking Docker Status"; // Default to checking state
   };
@@ -96,14 +92,11 @@ const DockerStatus: React.FC = () => {
   const getTooltipContent = (): string => {
     // Handle checking/initializing states
     if (status.error === "Initializing...") {
-      return "Status: Checking Docker status...";
-    }
-    if (status.error === "Docker restarting...") {
-      return "Status: Docker is restarting...";
+      return "Checking Docker Status...";
     }
 
     // When Docker is running, show status and version info
-    if (status.is_running && !status.is_paused && !status.error) {
+    if (status.is_running && !status.error) {
       const parts: string[] = [];
       parts.push(`Status: ${getStatusText()}`);
 
