@@ -1,10 +1,12 @@
 import React from "react";
+import SystemOverviewPage from "./SystemOverview/SystemOverviewPage";
 import HomePage from "./Home/HomePage";
 import SettingsPage from "./Settings/SettingsPage";
 import AboutPage from "./About/AboutPage";
 
 // Content mapping configuration
 export const CONTENT_MAP: Record<string, React.ReactNode> = {
+  "system-overview": <SystemOverviewPage />,
   home: <HomePage />,
   settings: <SettingsPage />,
   about: <AboutPage />,

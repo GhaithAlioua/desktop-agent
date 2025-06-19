@@ -1,4 +1,5 @@
 import React from "react";
+import SystemOverviewItem from "./Items/SystemOverviewItem";
 import HomeItem from "./Items/HomeItem";
 import SettingsItem from "./Items/SettingsItem";
 import AboutItem from "./Items/AboutItem";
@@ -16,6 +17,11 @@ export interface SidebarItemConfig {
 
 // Centralized sidebar items configuration
 export const SIDEBAR_ITEMS: SidebarItemConfig[] = [
+  {
+    key: "system-overview",
+    component: SystemOverviewItem,
+    enabled: true,
+  },
   {
     key: "home",
     component: HomeItem,
