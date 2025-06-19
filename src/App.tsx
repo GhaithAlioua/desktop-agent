@@ -5,7 +5,6 @@ import SidebarNavigation, {
 } from "./components/UI/Sidebar/SidebarNavigation";
 import ContentWindow from "./components/Core/ContentWindow";
 import StatusBar from "./components/Core/StatusBar";
-import StatusBarManager from "./components/UI/StatusBar/StatusBarManager";
 import TitleBarSeparator from "./components/Layout/TitleBarSeparator";
 import {
   CONTENT_MAP,
