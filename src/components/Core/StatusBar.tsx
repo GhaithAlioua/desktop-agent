@@ -5,7 +5,7 @@ const StatusBar: React.FC<{ className?: string }> = ({ className = "" }) => (
   <div
     className={`h-status-bar bg-primary-bg border-t border-border flex items-center px-0 overflow-visible text-secondary-text ${className}`}
     role="status"
-    aria-label="Status bar"
+    aria-label="Status Bar"
   >
     <StatusBarManager />
   </div>

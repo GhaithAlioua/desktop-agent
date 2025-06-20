@@ -5,9 +5,9 @@ const Sidebar: React.FC<{
   className?: string;
 }> = ({ children, className = "" }) => (
   <aside
-    className={`w-sidebar bg-secondary-bg border-r border-border flex flex-col overflow-hidden ${className}`}
+    className={`w-sidebar bg-primary-bg border-r border-border flex flex-col overflow-hidden ${className}`}
     role="complementary"
-    aria-label="Application sidebar"
+    aria-label="Sidebar"
   >
     {children}
   </aside>
