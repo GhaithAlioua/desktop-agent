@@ -28,7 +28,9 @@ futures-util = "0.3"
 reqwest = { version = "0.12.20", features = ["json"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1.0"
-sysinfo = { version = "0.30", features = ["serde"] }
+sysinfo = { version = "0.35", features = ["serde"] }
+winreg = "0.53"
+wgpu = "25.0.2"
 
 
 [features]
