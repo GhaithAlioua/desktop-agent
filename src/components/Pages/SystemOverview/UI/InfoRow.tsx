@@ -28,7 +28,7 @@ const InfoRow: React.FC<InfoRowProps> = ({
 
   const containerClassName = isError
     ? "bg-red-50 border border-red-200 rounded-md p-3"
-    : "border-b border-border pb-3";
+    : "pb-3";
 
   return (
     <div className={`flex justify-between items-center ${containerClassName}`}>

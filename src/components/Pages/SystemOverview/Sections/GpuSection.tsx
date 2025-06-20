@@ -14,6 +14,47 @@ interface GpuSectionProps {
 }
 
 const GpuSection: React.FC<GpuSectionProps> = ({ gpuInfo }) => {
+  const getGpuDisplayName = (gpu: GpuInfo, index: number) => {
+    // Use dynamic device type from wgpu enum
+    switch (gpu.device_type) {
+      case "DiscreteGpu":
+        return "Primary Graphics Card";
+      case "IntegratedGpu":
+        return "Integrated Graphics";
+      case "VirtualGpu":
+        return "Virtual Graphics";
+      case "Cpu":
+        return "CPU Graphics";
+      default:
+        return `GPU ${index + 1}`;
+    }
+  };
+
+  const formatBackendDisplay = (backend: string) => {
+    // Convert wgpu enum values to user-friendly display names
+    return backend
+      .split(", ")
+      .map((b) => {
+        switch (b) {
+          case "Vulkan":
+            return "Vulkan";
+          case "Dx12":
+            return "DirectX 12";
+          case "Dx11":
+            return "DirectX 11";
+          case "Metal":
+            return "Metal";
+          case "Gl":
+            return "OpenGL";
+          case "BrowserWebGpu":
+            return "WebGPU";
+          default:
+            return b;
+        }
+      })
+      .join(", ");
+  };
+
   return (
     <InfoCard title="GPU">
       <div className="bg-secondary-bg rounded-lg p-4">
@@ -23,97 +64,56 @@ const GpuSection: React.FC<GpuSectionProps> = ({ gpuInfo }) => {
               No GPU information available
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-6">
               {gpuInfo.Ok.map((gpu: GpuInfo, index: number) => (
-                <React.Fragment key={index}>
+                <div key={index} className="space-y-3">
+                  <h3 className="text-lg font-semibold text-main-text mb-3 border-b border-border pb-2">
+                    {getGpuDisplayName(gpu, index)}
+                  </h3>
                   <InfoRow
-                    label={`GPU ${index + 1} Name`}
+                    label="Model"
                     value={displayValueWithSeverity(gpu.name, "gpu_name").value}
                     severity={
                       displayValueWithSeverity(gpu.name, "gpu_name").severity
                     }
                   />
-                  <InfoRow
-                    label={`GPU ${index + 1} Driver`}
-                    value={
-                      displayValueWithSeverity(gpu.driver, "gpu_driver").value
-                    }
-                    severity={
-                      displayValueWithSeverity(gpu.driver, "gpu_driver")
-                        .severity
-                    }
-                  />
-                  <InfoRow
-                    label={`GPU ${index + 1} Driver Info`}
-                    value={
-                      displayValueWithSeverity(
-                        gpu.driver_info,
-                        "gpu_driver_info"
-                      ).value
-                    }
-                    severity={
-                      displayValueWithSeverity(
-                        gpu.driver_info,
-                        "gpu_driver_info"
-                      ).severity
-                    }
-                  />
-                  <InfoRow
-                    label={`GPU ${index + 1} Backend`}
-                    value={
-                      displayValueWithSeverity(gpu.backend, "gpu_backend").value
-                    }
-                    severity={
-                      displayValueWithSeverity(gpu.backend, "gpu_backend")
-                        .severity
-                    }
-                  />
-                  <InfoRow
-                    label={`GPU ${index + 1} Device Type`}
-                    value={
-                      displayValueWithSeverity(
-                        gpu.device_type,
-                        "gpu_device_type"
-                      ).value
-                    }
-                    severity={
-                      displayValueWithSeverity(
-                        gpu.device_type,
-                        "gpu_device_type"
-                      ).severity
-                    }
-                  />
-                  <InfoRow
-                    label={`GPU ${index + 1} Vendor ID`}
-                    value={
-                      displayValueWithSeverity(
-                        gpu.vendor_id.toString(),
-                        "gpu_vendor_id"
-                      ).value
-                    }
-                    severity={
-                      displayValueWithSeverity(
-                        gpu.vendor_id.toString(),
-                        "gpu_vendor_id"
-                      ).severity
-                    }
-                  />
-                  <InfoRow
-                    label={`GPU ${index + 1} Device ID`}
-                    value={
-                      displayValueWithSeverity(
-                        gpu.device_id.toString(),
-                        "gpu_device_id"
-                      ).value
-                    }
-                    severity={
-                      displayValueWithSeverity(
-                        gpu.device_id.toString(),
-                        "gpu_device_id"
-                      ).severity
-                    }
-                  />
-                </React.Fragment>
+                  {gpu.driver_info &&
+                    gpu.driver_info !== "Unavailable" &&
+                    !gpu.driver_info.startsWith("32.0") && (
+                      <InfoRow
+                        label="Driver Version"
+                        value={
+                          displayValueWithSeverity(
+                            gpu.driver_info,
+                            "gpu_driver_info"
+                          ).value
+                        }
+                        severity={
+                          displayValueWithSeverity(
+                            gpu.driver_info,
+                            "gpu_driver_info"
+                          ).severity
+                        }
+                      />
+                    )}
+                  {gpu.backend && gpu.backend !== "Unknown" && (
+                    <InfoRow
+                      label="Graphics APIs"
+                      value={
+                        displayValueWithSeverity(
+                          formatBackendDisplay(gpu.backend),
+                          "gpu_backend"
+                        ).value
+                      }
+                      severity={
+                        displayValueWithSeverity(
+                          formatBackendDisplay(gpu.backend),
+                          "gpu_backend"
+                        ).severity
+                      }
+                    />
+                  )}
+                </div>
               ))}
             </div>
           )

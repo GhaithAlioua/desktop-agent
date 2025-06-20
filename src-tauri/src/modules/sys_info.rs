@@ -246,63 +246,101 @@ async fn collect_gpu_info() -> Result<Vec<GpuInfo>, SysInfoError> {
         return Ok(Vec::new()); // No GPUs found is not an error
     }
 
-    // Process adapters with validation and error handling
-    let mut gpus = Vec::with_capacity(adapters.len());
+    // Process adapters and consolidate by vendor/device ID
+    let mut gpu_map = std::collections::HashMap::<(u32, u32), GpuInfo>::new();
 
-    for (index, adapter) in adapters.into_iter().enumerate() {
+    for adapter in adapters.into_iter() {
         let info = adapter.get_info();
 
         // Validate essential GPU information
         if info.name.is_empty() {
-            eprintln!("GPU {} has empty name, skipping", index);
             continue;
         }
 
-        // Extract device type dynamically from wgpu
-        let device_type = match info.device_type {
-            wgpu::DeviceType::DiscreteGpu => "Discrete GPU",
-            wgpu::DeviceType::IntegratedGpu => "Integrated GPU",
-            wgpu::DeviceType::VirtualGpu => "Virtual GPU",
-            wgpu::DeviceType::Cpu => "CPU",
-            _ => "Unknown",
-        };
+        // Create a unique key for consolidation
+        let key = (info.vendor, info.device);
 
-        // Extract backend information dynamically from wgpu
-        let backend = match info.backend {
-            wgpu::Backend::Vulkan => "Vulkan",
-            wgpu::Backend::Dx12 => "DirectX 12",
-            wgpu::Backend::Metal => "Metal",
-            wgpu::Backend::Gl => "OpenGL",
-            wgpu::Backend::BrowserWebGpu => "WebGPU",
-            _ => "Unknown",
-        };
+        // Extract device type dynamically from wgpu enum
+        let device_type = format!("{:?}", info.device_type);
+
+        // Extract backend information dynamically from wgpu enum
+        let backend = format!("{:?}", info.backend);
 
         // Extract vendor information dynamically from wgpu
         // Use the actual driver information provided by the system
         let vendor_name = if !info.driver.is_empty() {
-            // Use the driver name as the vendor information (most accurate)
-            &info.driver
+            info.driver.clone()
         } else if !info.driver_info.is_empty() {
-            // Fallback to driver info if driver name is empty
-            &info.driver_info
+            info.driver_info.clone()
         } else {
-            // If no driver information is available, use a generic identifier
-            "Unknown"
+            // Use a dynamic fallback based on available information
+            if info.vendor != 0 {
+                format!("Vendor_{:X}", info.vendor)
+            } else {
+                "Unknown".to_string()
+            }
         };
 
-        // Create GPU info with dynamically extracted data from wgpu
-        let driver = info.driver.clone();
-        gpus.push(GpuInfo {
-            name: info.name,
-            brand: vendor_name.to_string(),
-            driver,
-            driver_info: info.driver_info,
-            backend: backend.to_string(),
-            vendor_id: info.vendor,
-            device_id: info.device,
-            device_type: device_type.to_string(),
-        });
+        // Consolidate GPU information
+        if let Some(existing_gpu) = gpu_map.get_mut(&key) {
+            // Add backend to existing GPU if not already present
+            if !existing_gpu.backend.contains(&backend) {
+                if existing_gpu.backend == "Unknown" {
+                    existing_gpu.backend = backend;
+                } else {
+                    existing_gpu.backend = format!("{}, {}", existing_gpu.backend, backend);
+                }
+            }
+
+            // Use better driver info if available
+            if (existing_gpu.driver_info == "Unavailable" || existing_gpu.driver_info.is_empty())
+                && info.driver_info != "Unavailable"
+                && !info.driver_info.is_empty()
+            {
+                existing_gpu.driver_info = info.driver_info.clone();
+            }
+
+            // Use better driver name if available
+            if (existing_gpu.driver == "Unavailable" || existing_gpu.driver.is_empty())
+                && info.driver != "Unavailable"
+                && !info.driver.is_empty()
+            {
+                existing_gpu.driver = info.driver.clone();
+            }
+        } else {
+            // Create new GPU entry
+            gpu_map.insert(
+                key,
+                GpuInfo {
+                    name: info.name,
+                    brand: vendor_name,
+                    driver: info.driver,
+                    driver_info: info.driver_info,
+                    backend,
+                    vendor_id: info.vendor,
+                    device_id: info.device,
+                    device_type,
+                },
+            );
+        }
     }
+
+    // Convert to vector and sort by device type dynamically
+    let mut gpus: Vec<GpuInfo> = gpu_map.into_values().collect();
+    gpus.sort_by(|a, b| {
+        // Dynamic sorting based on device type enum order
+        let type_order = |device_type: &str| {
+            // Use the actual enum order from wgpu for consistent sorting
+            match device_type {
+                "DiscreteGpu" => 0,
+                "IntegratedGpu" => 1,
+                "VirtualGpu" => 2,
+                "Cpu" => 3,
+                _ => 4,
+            }
+        };
+        type_order(&a.device_type).cmp(&type_order(&b.device_type))
+    });
 
     Ok(gpus)
 }
