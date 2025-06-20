@@ -64,12 +64,12 @@ const DockerStatus: React.FC = () => {
   }, []);
 
   const getStatusColor = (): string => {
-    // Check if we're in the initializing/checking state
+    // Check for specific non-error states first
     if (
       status.error === "Initializing..." ||
-      status.error === "Docker restarting..."
+      status.error === "Connection lost, attempting to reconnect..."
     ) {
-      return "bg-gray-400"; // Grey for checking state
+      return "bg-gray-400"; // Grey for checking/reconnecting state
     }
     if (status.error && !status.is_running) return "bg-red-500";
     if (status.is_running) return "bg-green-500";
@@ -77,12 +77,12 @@ const DockerStatus: React.FC = () => {
   };
 
   const getStatusText = (): string => {
-    // Check if we're in the initializing/checking state
+    // Handle specific states
     if (status.error === "Initializing...") {
       return "Checking Docker Status";
     }
-    if (status.error === "Docker restarting...") {
-      return "Restarting...";
+    if (status.error === "Connection lost, attempting to reconnect...") {
+      return "Reconnecting...";
     }
     if (status.error && !status.is_running) return "Not Running";
     if (status.is_running) return "Running";
@@ -90,9 +90,12 @@ const DockerStatus: React.FC = () => {
   };
 
   const getTooltipContent = (): string => {
-    // Handle checking/initializing states
+    // Handle checking/initializing/reconnecting states
     if (status.error === "Initializing...") {
       return "Checking Docker Status...";
+    }
+    if (status.error === "Connection lost, attempting to reconnect...") {
+      return "Connection to Docker was lost. Attempting to reconnect...";
     }
 
     // When Docker is running, show status and version info
