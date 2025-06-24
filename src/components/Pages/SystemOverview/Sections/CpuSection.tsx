@@ -52,39 +52,33 @@ const CpuSection: React.FC<CpuSectionProps> = ({ cpuInfo }) => {
 
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-secondary-text">Brand:</span>
+              <span className="text-secondary-text">Model:</span>
               <span className="font-medium text-primary-text">
-                {cpuInfo.brand || "Unknown"}
+                {cpuInfo.brand || "CPU model unavailable"}
               </span>
             </div>
-
             <div className="flex justify-between items-center">
               <span className="text-secondary-text">Frequency:</span>
               <span className="font-medium text-primary-text">
-                {typeof cpuInfo.frequency === "number" && cpuInfo.frequency > 0
-                  ? cpuInfo.frequency
-                  : "N/A"}{" "}
-                MHz
+                {cpuInfo.frequency > 0
+                  ? `${(cpuInfo.frequency / 1000).toFixed(1)} GHz`
+                  : "Frequency unavailable"}
               </span>
             </div>
-
             <div className="flex justify-between items-center">
               <span className="text-secondary-text">Physical Cores:</span>
               <span className="font-medium text-primary-text">
-                {typeof cpuInfo.physical_cores === "number" &&
-                cpuInfo.physical_cores > 0
-                  ? cpuInfo.physical_cores
-                  : "N/A"}
+                {cpuInfo.physical_cores > 0
+                  ? cpuInfo.physical_cores.toString()
+                  : "Core count unavailable"}
               </span>
             </div>
-
             <div className="flex justify-between items-center">
               <span className="text-secondary-text">Logical Cores:</span>
               <span className="font-medium text-primary-text">
-                {typeof cpuInfo.logical_cores === "number" &&
-                cpuInfo.logical_cores > 0
-                  ? cpuInfo.logical_cores
-                  : "N/A"}
+                {cpuInfo.logical_cores > 0
+                  ? cpuInfo.logical_cores.toString()
+                  : "Thread count unavailable"}
               </span>
             </div>
           </div>

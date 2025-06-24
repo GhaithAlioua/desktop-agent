@@ -65,42 +65,38 @@ const GpuSection: React.FC<GpuSectionProps> = ({ gpuInfo }) => {
             className="border border-border rounded-lg p-4 bg-secondary-bg"
           >
             <h3 className="font-medium text-primary-text mb-3">
-              {gpu.name || "Unknown GPU"}
+              {gpu.name || "GPU model unavailable"}
             </h3>
 
             <div className="space-y-2">
-              {gpu.memory_total_mb !== undefined && (
-                <div className="flex justify-between items-center">
-                  <span className="text-secondary-text">Memory:</span>
-                  <span className="font-medium text-primary-text">
-                    {gpu.memory_used_mb !== undefined
-                      ? `${gpu.memory_used_mb} / ${gpu.memory_total_mb} MB`
-                      : `${gpu.memory_total_mb} MB`}
-                  </span>
-                </div>
-              )}
-
-              {gpu.utilization_percent !== undefined && (
-                <div className="flex justify-between items-center">
-                  <span className="text-secondary-text">Utilization:</span>
-                  <span className="font-medium text-primary-text">
-                    {gpu.utilization_percent !== undefined
-                      ? `${gpu.utilization_percent}%`
-                      : "N/A"}
-                  </span>
-                </div>
-              )}
-
-              {gpu.temperature_celsius !== undefined && (
-                <div className="flex justify-between items-center">
-                  <span className="text-secondary-text">Temperature:</span>
-                  <span className="font-medium text-primary-text">
-                    {gpu.temperature_celsius !== undefined
-                      ? `${gpu.temperature_celsius}°C`
-                      : "N/A"}
-                  </span>
-                </div>
-              )}
+              <div className="flex justify-between items-center">
+                <span className="text-secondary-text">Memory:</span>
+                <span className="font-medium text-primary-text">
+                  {gpu.memory_total_gb && gpu.memory_used_gb
+                    ? `${gpu.memory_used_gb.toFixed(
+                        1
+                      )} / ${gpu.memory_total_gb.toFixed(1)} GB`
+                    : "Memory information unavailable"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-secondary-text">Utilization:</span>
+                <span className="font-medium text-primary-text">
+                  {gpu.utilization_percent !== null &&
+                  gpu.utilization_percent !== undefined
+                    ? `${gpu.utilization_percent}%`
+                    : "Utilization unavailable"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-secondary-text">Temperature:</span>
+                <span className="font-medium text-primary-text">
+                  {gpu.temperature_celsius !== null &&
+                  gpu.temperature_celsius !== undefined
+                    ? `${gpu.temperature_celsius}°C`
+                    : "Temperature unavailable"}
+                </span>
+              </div>
             </div>
           </div>
         ))}

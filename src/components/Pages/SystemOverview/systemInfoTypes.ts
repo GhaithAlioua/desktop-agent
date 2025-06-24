@@ -19,33 +19,47 @@ export interface CpuInfo {
 
 export interface GpuInfo {
   name: string;
-  memory_total_mb?: number;
-  memory_used_mb?: number;
+  memory_total_gb?: number;
+  memory_used_gb?: number;
   utilization_percent?: number;
   temperature_celsius?: number;
 }
 
 export interface MemoryInfo {
-  total_mb: number;
-  used_mb: number;
-  free_mb: number;
+  total_gb: number;
+  used_gb: number;
+  free_gb: number;
 }
 
 export interface StorageDevice {
   name: string;
-  total_gb: number;
-  used_gb: number;
-  available_gb: number;
+  total_size: number;
+  used_size: number;
+  available_size: number;
+  unit: string; // "GB" or "TB"
 }
 
 export interface StorageInfo {
   devices: StorageDevice[];
 }
 
+export interface PerformanceInfo {
+  overall_score?: number;
+  cpu_benchmark_score?: number;
+  gpu_benchmark_score?: number;
+  memory_benchmark_score?: number;
+  storage_benchmark_score?: number;
+}
+
 // Rust error types that match the backend
 export type SysInfoError = 
   | { System: string }
   | { Nvml: string };
+
+// Rust Result type
+export type RustResult<T, E> = 
+  | { Ok: T }
+  | { Err: E };
 
 export interface SystemInfo {
   os: OperatingSystemInfo | SysInfoError;
@@ -70,6 +84,11 @@ export function getErrorMessage(error: SysInfoError): string {
   if ('System' in error) return error.System;
   if ('Nvml' in error) return error.Nvml;
   return 'Unknown error';
+}
+
+// Helper function to format errors from Rust Result
+export function formatError(error: SysInfoError): string {
+  return getErrorMessage(error);
 }
 
 // Helper to unwrap Rust-style Result objects

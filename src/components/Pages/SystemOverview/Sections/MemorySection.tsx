@@ -34,29 +34,15 @@ const MemorySection: React.FC<MemorySectionProps> = ({ memoryInfo }) => {
     );
   }
 
-  const totalGB =
-    typeof memoryInfo.total_mb === "number" && memoryInfo.total_mb > 0
-      ? (memoryInfo.total_mb / 1024).toFixed(1)
-      : "N/A";
-  const usedGB =
-    typeof memoryInfo.used_mb === "number" && memoryInfo.used_mb > 0
-      ? (memoryInfo.used_mb / 1024).toFixed(1)
-      : "N/A";
-  const freeGB =
-    typeof memoryInfo.free_mb === "number" && memoryInfo.free_mb > 0
-      ? (memoryInfo.free_mb / 1024).toFixed(1)
-      : "N/A";
   const usedPercentage =
-    typeof memoryInfo.used_mb === "number" &&
-    typeof memoryInfo.total_mb === "number" &&
-    memoryInfo.total_mb > 0
-      ? (memoryInfo.used_mb / memoryInfo.total_mb) * 100
+    typeof memoryInfo.used_gb === "number" &&
+    typeof memoryInfo.total_gb === "number" &&
+    memoryInfo.total_gb > 0
+      ? (memoryInfo.used_gb / memoryInfo.total_gb) * 100
       : null;
   const getUsageColor = (percentage: number | null) => {
     if (percentage === null) return "bg-gray-500";
-    if (percentage > 90) return "bg-red-500";
-    if (percentage > 75) return "bg-yellow-500";
-    return "bg-green-500";
+    return "bg-progress-blue";
   };
 
   return (
@@ -71,35 +57,43 @@ const MemorySection: React.FC<MemorySectionProps> = ({ memoryInfo }) => {
 
       <div className="space-y-4">
         <div className="border border-border rounded-lg p-4 bg-secondary-bg">
-          <h3 className="font-medium text-primary-text mb-3">
-            Memory Information
-          </h3>
+          <h3 className="font-medium text-primary-text mb-3">RAM</h3>
 
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-secondary-text">Total:</span>
               <span className="font-medium text-primary-text">
-                {totalGB} GB
+                {memoryInfo.total_gb > 0
+                  ? `${memoryInfo.total_gb.toFixed(1)} GB`
+                  : "Total memory unavailable"}
               </span>
             </div>
 
             <div className="flex justify-between items-center">
               <span className="text-secondary-text">Used:</span>
-              <span className="font-medium text-primary-text">{usedGB} GB</span>
+              <span className="font-medium text-primary-text">
+                {memoryInfo.used_gb >= 0
+                  ? `${memoryInfo.used_gb.toFixed(1)} GB`
+                  : "Used memory unavailable"}
+              </span>
             </div>
 
             <div className="flex justify-between items-center">
               <span className="text-secondary-text">Free:</span>
-              <span className="font-medium text-primary-text">{freeGB} GB</span>
+              <span className="font-medium text-primary-text">
+                {memoryInfo.free_gb >= 0
+                  ? `${memoryInfo.free_gb.toFixed(1)} GB`
+                  : "Free memory unavailable"}
+              </span>
             </div>
 
             <div className="pt-2">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-secondary-text">Usage:</span>
-                <span className="font-medium text-primary-text">
-                  {usedPercentage !== null
-                    ? usedPercentage.toFixed(1) + "%"
-                    : "N/A"}
+              <div className="flex justify-between items-center text-sm text-secondary-text">
+                <span>Usage</span>
+                <span>
+                  {usedPercentage !== null && usedPercentage > 0
+                    ? `${usedPercentage.toFixed(1)}%`
+                    : "Usage percentage unavailable"}
                 </span>
               </div>
               <div className="w-full bg-gray-700 rounded-full h-2">

@@ -5,6 +5,7 @@ import {
   isError,
   getErrorMessage,
 } from "../systemInfoTypes";
+import InfoRow from "../UI/InfoRow";
 
 interface OperatingSystemSectionProps {
   osInfo: OperatingSystemInfo | SysInfoError;
@@ -39,7 +40,9 @@ const OperatingSystemSection: React.FC<OperatingSystemSectionProps> = ({
   }
 
   const formatUptime = (seconds: number | undefined): string => {
-    if (typeof seconds !== "number" || isNaN(seconds)) return "N/A";
+    if (typeof seconds !== "number" || isNaN(seconds)) {
+      return "Uptime unavailable";
+    }
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -71,30 +74,22 @@ const OperatingSystemSection: React.FC<OperatingSystemSectionProps> = ({
           </h3>
 
           <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-secondary-text">Name:</span>
-              <span className="font-medium text-primary-text">
-                {osInfo.name || "Unknown"}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-secondary-text">Version:</span>
-              <span className="font-medium text-primary-text">
-                {osInfo.version || "Unknown"}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-secondary-text">Kernel Version:</span>
-              <span className="font-medium text-primary-text">
-                {osInfo.kernel_version || "Unknown"}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-secondary-text">Hostname:</span>
-              <span className="font-medium text-primary-text">
-                {osInfo.hostname || "Unknown"}
-              </span>
-            </div>
+            <InfoRow
+              label="Operating System"
+              value={osInfo.name || "OS name unavailable"}
+            />
+            <InfoRow
+              label="Version"
+              value={osInfo.version || "Version unavailable"}
+            />
+            <InfoRow
+              label="Kernel"
+              value={osInfo.kernel_version || "Kernel version unavailable"}
+            />
+            <InfoRow
+              label="Hostname"
+              value={osInfo.hostname || "Hostname unavailable"}
+            />
             <div className="flex justify-between items-center">
               <span className="text-secondary-text">Uptime:</span>
               <span className="font-medium text-primary-text">

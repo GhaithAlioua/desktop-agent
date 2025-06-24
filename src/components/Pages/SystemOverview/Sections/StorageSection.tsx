@@ -1,7 +1,6 @@
 import React from "react";
 import {
   StorageInfo,
-  StorageDevice,
   SysInfoError,
   isError,
   getErrorMessage,
@@ -57,17 +56,14 @@ const StorageSection: React.FC<StorageSectionProps> = ({ storageInfo }) => {
 
   const getUsageColor = (percentage: number | null) => {
     if (percentage === null) return "bg-gray-500";
-    if (percentage > 90) return "bg-red-500";
-    if (percentage > 75) return "bg-yellow-500";
-    return "bg-green-500";
+    return "bg-progress-blue";
   };
 
-  const formatStorageName = (name: string) => {
-    // Clean up device names for better display
-    return name
-      .replace(/\\/g, "")
-      .replace(/\./g, "")
-      .replace(/^[A-Z]:/, "Drive");
+  const formatStorageName = (name: string): string => {
+    if (!name || name.trim() === "") {
+      return "Storage device unavailable";
+    }
+    return name;
   };
 
   return (
@@ -82,23 +78,14 @@ const StorageSection: React.FC<StorageSectionProps> = ({ storageInfo }) => {
 
       <div className="space-y-4">
         {storageInfo.devices.map((device, index) => {
-          const totalGB =
-            typeof device.total_gb === "number" && device.total_gb > 0
-              ? device.total_gb.toFixed(1)
-              : "N/A";
-          const usedGB =
-            typeof device.used_gb === "number" && device.used_gb > 0
-              ? device.used_gb.toFixed(1)
-              : "N/A";
-          const availableGB =
-            typeof device.available_gb === "number" && device.available_gb > 0
-              ? device.available_gb.toFixed(1)
-              : "N/A";
-          const usedPercentage =
-            typeof device.used_gb === "number" &&
-            typeof device.total_gb === "number" &&
-            device.total_gb > 0
-              ? (device.used_gb / device.total_gb) * 100
+          const totalSize = device.total_size.toFixed(1);
+          const usedSize = device.used_size.toFixed(1);
+          const availableSize = device.available_size.toFixed(1);
+          const usagePercentage =
+            typeof device.used_size === "number" &&
+            typeof device.total_size === "number" &&
+            device.total_size > 0
+              ? (device.used_size / device.total_size) * 100
               : null;
           return (
             <div
@@ -106,49 +93,50 @@ const StorageSection: React.FC<StorageSectionProps> = ({ storageInfo }) => {
               className="border border-border rounded-lg p-4 bg-secondary-bg"
             >
               <h3 className="font-medium text-primary-text mb-3">
-                {formatStorageName(device.name) || "Unknown Device"}
+                {formatStorageName(device.name)}
               </h3>
 
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-secondary-text">Total:</span>
                   <span className="font-medium text-primary-text">
-                    {totalGB} GB
+                    {totalSize} {device.unit}
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center">
                   <span className="text-secondary-text">Used:</span>
                   <span className="font-medium text-primary-text">
-                    {usedGB} GB
+                    {usedSize} {device.unit}
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center">
                   <span className="text-secondary-text">Available:</span>
                   <span className="font-medium text-primary-text">
-                    {availableGB} GB
+                    {availableSize} {device.unit}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center text-sm text-secondary-text">
+                  <span>Usage</span>
+                  <span>
+                    {usagePercentage !== null && usagePercentage > 0
+                      ? `${usagePercentage.toFixed(1)}%`
+                      : "Usage percentage unavailable"}
                   </span>
                 </div>
 
                 <div className="pt-2">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-secondary-text">Usage:</span>
-                    <span className="font-medium text-primary-text">
-                      {usedPercentage !== null
-                        ? usedPercentage.toFixed(1) + "%"
-                        : "N/A"}
-                    </span>
-                  </div>
                   <div className="w-full bg-gray-700 rounded-full h-2">
                     <div
                       className={`h-2 rounded-full ${getUsageColor(
-                        usedPercentage
+                        usagePercentage
                       )} transition-all duration-300`}
                       style={{
                         width:
-                          usedPercentage !== null
-                            ? `${Math.min(usedPercentage, 100)}%`
+                          usagePercentage !== null
+                            ? `${Math.min(usagePercentage, 100)}%`
                             : "0%",
                       }}
                     ></div>

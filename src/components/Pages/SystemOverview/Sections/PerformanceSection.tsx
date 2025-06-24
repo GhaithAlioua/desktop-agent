@@ -16,10 +16,12 @@ const PerformanceSection: React.FC<PerformanceSectionProps> = ({
 }) => {
   const getPerformanceScoreColor = (score?: number) => {
     if (!score) return "text-gray-500";
-    if (score >= 80) return "text-green-500";
-    if (score >= 60) return "text-blue-500";
-    if (score >= 40) return "text-yellow-500";
-    return "text-red-500";
+    return "text-progress-blue";
+  };
+
+  const getPerformanceProgressColor = (score?: number) => {
+    if (!score) return "bg-gray-500";
+    return "bg-progress-blue";
   };
 
   const getPerformanceScoreIcon = (score?: number) => {
@@ -31,11 +33,18 @@ const PerformanceSection: React.FC<PerformanceSectionProps> = ({
   };
 
   const getPerformanceLevel = (score?: number) => {
-    if (!score) return "Unknown";
+    if (!score || score <= 0) return "Performance level unavailable";
     if (score >= 80) return "Excellent";
     if (score >= 60) return "Good";
     if (score >= 40) return "Average";
     return "Below Average";
+  };
+
+  const getPerformanceScore = (score: number | null | undefined): string => {
+    if (score === null || score === undefined || score <= 0) {
+      return "Performance score unavailable";
+    }
+    return score.toFixed(1);
   };
 
   return (
@@ -57,7 +66,7 @@ const PerformanceSection: React.FC<PerformanceSectionProps> = ({
                   >
                     {performanceInfo.Ok.overall_score
                       ? `${performanceInfo.Ok.overall_score.toFixed(1)}/100`
-                      : "Not Available"}
+                      : "Performance score unavailable"}
                   </h4>
                   <p className="text-sm text-secondary-text">
                     Overall Performance Score
@@ -78,9 +87,9 @@ const PerformanceSection: React.FC<PerformanceSectionProps> = ({
                   </div>
                   <div className="w-full bg-border rounded-full h-3">
                     <div
-                      className={`h-3 rounded-full ${getPerformanceScoreColor(
+                      className={`h-3 rounded-full ${getPerformanceProgressColor(
                         performanceInfo.Ok.overall_score
-                      ).replace("text-", "bg-")}`}
+                      )}`}
                       style={{ width: `${performanceInfo.Ok.overall_score}%` }}
                     ></div>
                   </div>
@@ -114,9 +123,9 @@ const PerformanceSection: React.FC<PerformanceSectionProps> = ({
                     </div>
                     <div className="w-full bg-border rounded-full h-2">
                       <div
-                        className={`h-2 rounded-full ${getPerformanceScoreColor(
+                        className={`h-2 rounded-full ${getPerformanceProgressColor(
                           performanceInfo.Ok.cpu_benchmark_score
-                        ).replace("text-", "bg-")}`}
+                        )}`}
                         style={{
                           width: `${performanceInfo.Ok.cpu_benchmark_score}%`,
                         }}
@@ -154,9 +163,9 @@ const PerformanceSection: React.FC<PerformanceSectionProps> = ({
                     </div>
                     <div className="w-full bg-border rounded-full h-2">
                       <div
-                        className={`h-2 rounded-full ${getPerformanceScoreColor(
+                        className={`h-2 rounded-full ${getPerformanceProgressColor(
                           performanceInfo.Ok.gpu_benchmark_score
-                        ).replace("text-", "bg-")}`}
+                        )}`}
                         style={{
                           width: `${performanceInfo.Ok.gpu_benchmark_score}%`,
                         }}
@@ -194,9 +203,9 @@ const PerformanceSection: React.FC<PerformanceSectionProps> = ({
                     </div>
                     <div className="w-full bg-border rounded-full h-2">
                       <div
-                        className={`h-2 rounded-full ${getPerformanceScoreColor(
+                        className={`h-2 rounded-full ${getPerformanceProgressColor(
                           performanceInfo.Ok.memory_benchmark_score
-                        ).replace("text-", "bg-")}`}
+                        )}`}
                         style={{
                           width: `${performanceInfo.Ok.memory_benchmark_score}%`,
                         }}
@@ -235,9 +244,9 @@ const PerformanceSection: React.FC<PerformanceSectionProps> = ({
                     </div>
                     <div className="w-full bg-border rounded-full h-2">
                       <div
-                        className={`h-2 rounded-full ${getPerformanceScoreColor(
+                        className={`h-2 rounded-full ${getPerformanceProgressColor(
                           performanceInfo.Ok.storage_benchmark_score
-                        ).replace("text-", "bg-")}`}
+                        )}`}
                         style={{
                           width: `${performanceInfo.Ok.storage_benchmark_score}%`,
                         }}

@@ -557,12 +557,16 @@ async fn try_connect_docker(
     let engine_version = DockerVersion {
         version: version_info
             .version
-            .unwrap_or_else(|| "Unknown".to_string()),
+            .unwrap_or_else(|| "Version information unavailable".to_string()),
         api_version: version_info
             .api_version
-            .unwrap_or_else(|| "Unknown".to_string()),
-        os: version_info.os.unwrap_or_else(|| "Unknown".to_string()),
-        arch: version_info.arch.unwrap_or_else(|| "Unknown".to_string()),
+            .unwrap_or_else(|| "API version information unavailable".to_string()),
+        os: version_info
+            .os
+            .unwrap_or_else(|| "OS information unavailable".to_string()),
+        arch: version_info
+            .arch
+            .unwrap_or_else(|| "Architecture information unavailable".to_string()),
     };
 
     let desktop_version = get_docker_desktop_version();

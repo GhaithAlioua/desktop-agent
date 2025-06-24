@@ -2,12 +2,32 @@ import React from "react";
 import InfoCard from "../UI/InfoCard";
 import InfoRow from "../UI/InfoRow";
 import {
-  NetworkInfo,
+  // NetworkInfo, // TODO: Define this type when network functionality is implemented
   SysInfoError,
   RustResult,
   formatError,
-  formatNetworkSpeed,
+  // formatNetworkSpeed, // TODO: Define this function when network functionality is implemented
 } from "../systemInfoTypes";
+
+// TODO: Define NetworkInfo type when network functionality is implemented
+interface NetworkInfo {
+  network_type?: string;
+  download_speed_mbps?: number;
+  upload_speed_mbps?: number;
+  latency_ms?: number;
+  isp_name?: string;
+  public_ip?: string;
+  location_region?: string;
+  location_country?: string;
+}
+
+// TODO: Define formatNetworkSpeed function when network functionality is implemented
+const formatNetworkSpeed = (speed: number): string => {
+  if (speed >= 1000) {
+    return `${(speed / 1000).toFixed(1)} Gbps`;
+  }
+  return `${speed.toFixed(1)} Mbps`;
+};
 
 interface NetworkSectionProps {
   networkInfo: RustResult<NetworkInfo, SysInfoError>;
@@ -75,7 +95,7 @@ const NetworkSection: React.FC<NetworkSectionProps> = ({ networkInfo }) => {
                   Network Status
                 </h4>
                 <p className="text-sm text-secondary-text">
-                  {networkInfo.Ok.network_type || "Unknown connection type"}
+                  {networkInfo.Ok.network_type || "Connection type unavailable"}
                 </p>
               </div>
             </div>
