@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { SystemInfo } from "./systemInfoTypes";
+import { SystemInfo, unwrapResult } from "./systemInfoTypes";
 
 // Import the new section components
 import OperatingSystemSection from "./Sections/OperatingSystemSection";
@@ -72,11 +72,11 @@ const SystemOverviewPage: React.FC = () => {
         </h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          <OperatingSystemSection osInfo={systemInfo.os} />
-          <CpuSection cpuInfo={systemInfo.cpu} />
-          <GpuSection gpuInfo={systemInfo.gpu} />
-          <MemorySection memoryInfo={systemInfo.memory} />
-          <StorageSection storageInfo={systemInfo.storage} />
+          <OperatingSystemSection osInfo={unwrapResult(systemInfo.os)} />
+          <CpuSection cpuInfo={unwrapResult(systemInfo.cpu)} />
+          <GpuSection gpuInfo={unwrapResult(systemInfo.gpu)} />
+          <MemorySection memoryInfo={unwrapResult(systemInfo.memory)} />
+          <StorageSection storageInfo={unwrapResult(systemInfo.storage)} />
         </div>
       </div>
     </div>

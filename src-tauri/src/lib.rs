@@ -4,12 +4,17 @@
 // Declare the modules that contain our application's core logic.
 pub mod modules;
 
+// Tauri plugin for opening URLs/files
+use tauri_plugin_opener;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Get the state from the docker module
     let docker_state = modules::docker::get_docker_state();
 
     tauri::Builder::default()
+        // Register the opener plugin for opening URLs/files
+        .plugin(tauri_plugin_opener::init())
         .setup(move |app| {
             let app_handle = app.handle().clone();
             // Call the initialization function from the docker module

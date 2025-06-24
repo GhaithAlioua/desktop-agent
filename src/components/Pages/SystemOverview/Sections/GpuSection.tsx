@@ -1,131 +1,111 @@
 import React from "react";
-import InfoCard from "../UI/InfoCard";
-import InfoRow from "../UI/InfoRow";
 import {
   GpuInfo,
   SysInfoError,
-  RustResult,
-  displayValueWithSeverity,
-  formatError,
+  isError,
+  getErrorMessage,
 } from "../systemInfoTypes";
 
 interface GpuSectionProps {
-  gpuInfo: RustResult<GpuInfo[], SysInfoError>;
+  gpuInfo: GpuInfo[] | SysInfoError;
 }
 
 const GpuSection: React.FC<GpuSectionProps> = ({ gpuInfo }) => {
-  const getGpuDisplayName = (gpu: GpuInfo, index: number) => {
-    // Use dynamic device type from wgpu enum
-    switch (gpu.device_type) {
-      case "DiscreteGpu":
-        return "Primary Graphics Card";
-      case "IntegratedGpu":
-        return "Integrated Graphics";
-      case "VirtualGpu":
-        return "Virtual Graphics";
-      case "Cpu":
-        return "CPU Graphics";
-      default:
-        return `GPU ${index + 1}`;
-    }
-  };
+  if (!gpuInfo || typeof gpuInfo !== "object") {
+    return (
+      <div className="bg-accent-bg rounded-xl shadow p-6 border border-error text-error">
+        Invalid GPU info
+      </div>
+    );
+  }
+  if (isError(gpuInfo)) {
+    return (
+      <div className="bg-accent-bg rounded-xl shadow p-6 border border-error text-error">
+        <div className="flex items-center mb-4">
+          <div className="w-8 h-8 bg-error/10 rounded-lg flex items-center justify-center mr-3">
+            <span className="text-error text-lg">⚠️</span>
+          </div>
+          <h2 className="text-xl font-semibold text-primary-text">GPU</h2>
+        </div>
+        <div className="text-error text-sm">
+          Error: {getErrorMessage(gpuInfo)}
+        </div>
+      </div>
+    );
+  }
 
-  const formatBackendDisplay = (backend: string) => {
-    // Convert wgpu enum values to user-friendly display names
-    return backend
-      .split(", ")
-      .map((b) => {
-        switch (b) {
-          case "Vulkan":
-            return "Vulkan";
-          case "Dx12":
-            return "DirectX 12";
-          case "Dx11":
-            return "DirectX 11";
-          case "Metal":
-            return "Metal";
-          case "Gl":
-            return "OpenGL";
-          case "BrowserWebGpu":
-            return "WebGPU";
-          default:
-            return b;
-        }
-      })
-      .join(", ");
-  };
+  if (!Array.isArray(gpuInfo) || gpuInfo.length === 0) {
+    return (
+      <div className="bg-accent-bg rounded-xl shadow p-6 border border-border">
+        <div className="flex items-center mb-4">
+          <div className="w-8 h-8 bg-purple-900/30 rounded-lg flex items-center justify-center mr-3">
+            <span className="text-purple-400 text-lg">🎮</span>
+          </div>
+          <h2 className="text-xl font-semibold text-primary-text">GPU</h2>
+        </div>
+        <div className="text-secondary-text text-sm">No GPUs detected</div>
+      </div>
+    );
+  }
 
   return (
-    <InfoCard title="GPU">
-      <div className="bg-secondary-bg rounded-lg p-4">
-        {"Ok" in gpuInfo ? (
-          gpuInfo.Ok.length === 0 ? (
-            <div className="text-center text-neutral-400">
-              No GPU information available
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {gpuInfo.Ok.map((gpu: GpuInfo, index: number) => (
-                <div key={index} className="space-y-3">
-                  <h3 className="text-lg font-semibold text-main-text mb-3 border-b border-border pb-2">
-                    {getGpuDisplayName(gpu, index)}
-                  </h3>
-                  <InfoRow
-                    label="Model"
-                    value={displayValueWithSeverity(gpu.name, "gpu_name").value}
-                    severity={
-                      displayValueWithSeverity(gpu.name, "gpu_name").severity
-                    }
-                  />
-                  {gpu.driver_info &&
-                    gpu.driver_info !== "Unavailable" &&
-                    !gpu.driver_info.startsWith("32.0") && (
-                      <InfoRow
-                        label="Driver Version"
-                        value={
-                          displayValueWithSeverity(
-                            gpu.driver_info,
-                            "gpu_driver_info"
-                          ).value
-                        }
-                        severity={
-                          displayValueWithSeverity(
-                            gpu.driver_info,
-                            "gpu_driver_info"
-                          ).severity
-                        }
-                      />
-                    )}
-                  {gpu.backend && gpu.backend !== "Unknown" && (
-                    <InfoRow
-                      label="Graphics APIs"
-                      value={
-                        displayValueWithSeverity(
-                          formatBackendDisplay(gpu.backend),
-                          "gpu_backend"
-                        ).value
-                      }
-                      severity={
-                        displayValueWithSeverity(
-                          formatBackendDisplay(gpu.backend),
-                          "gpu_backend"
-                        ).severity
-                      }
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-          )
-        ) : (
-          <InfoRow
-            label="Error"
-            value={formatError(gpuInfo.Err)}
-            isError={true}
-          />
-        )}
+    <div className="bg-accent-bg rounded-xl shadow p-6 border border-border">
+      <div className="flex items-center mb-4">
+        <div className="w-8 h-8 bg-purple-900/30 rounded-lg flex items-center justify-center mr-3">
+          <span className="text-purple-400 text-lg">🎮</span>
+        </div>
+        <h2 className="text-xl font-semibold text-primary-text">GPU</h2>
       </div>
-    </InfoCard>
+      <div className="border-t border-border mb-4" />
+
+      <div className="space-y-4">
+        {gpuInfo.map((gpu, index) => (
+          <div
+            key={index}
+            className="border border-border rounded-lg p-4 bg-secondary-bg"
+          >
+            <h3 className="font-medium text-primary-text mb-3">
+              {gpu.name || "Unknown GPU"}
+            </h3>
+
+            <div className="space-y-2">
+              {gpu.memory_total_mb !== undefined && (
+                <div className="flex justify-between items-center">
+                  <span className="text-secondary-text">Memory:</span>
+                  <span className="font-medium text-primary-text">
+                    {gpu.memory_used_mb !== undefined
+                      ? `${gpu.memory_used_mb} / ${gpu.memory_total_mb} MB`
+                      : `${gpu.memory_total_mb} MB`}
+                  </span>
+                </div>
+              )}
+
+              {gpu.utilization_percent !== undefined && (
+                <div className="flex justify-between items-center">
+                  <span className="text-secondary-text">Utilization:</span>
+                  <span className="font-medium text-primary-text">
+                    {gpu.utilization_percent !== undefined
+                      ? `${gpu.utilization_percent}%`
+                      : "N/A"}
+                  </span>
+                </div>
+              )}
+
+              {gpu.temperature_celsius !== undefined && (
+                <div className="flex justify-between items-center">
+                  <span className="text-secondary-text">Temperature:</span>
+                  <span className="font-medium text-primary-text">
+                    {gpu.temperature_celsius !== undefined
+                      ? `${gpu.temperature_celsius}°C`
+                      : "N/A"}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };
 

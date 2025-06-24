@@ -1,418 +1,213 @@
+use nvml_wrapper::Nvml;
 use serde::Serialize;
-use sysinfo::{CpuRefreshKind, Disks, RefreshKind, System};
+use sysinfo::{Disks, System};
 use thiserror::Error;
-use wgpu;
 
-// --- Custom Error Type for Structured Error Handling ---
+/// Constants for memory calculations
+const MB_IN_BYTES: u64 = 1024 * 1024;
+const GB_IN_BYTES: f64 = 1024.0 * 1024.0 * 1024.0;
+
+/// Error types for system information collection
 #[derive(Debug, Error, Serialize, Clone)]
 pub enum SysInfoError {
-    #[error("Failed to retrieve system information: {0}")]
-    SystemData(String),
-    #[error("No CPU information was found on the system.")]
-    NoCpuFound,
-    #[error("Registry Error: {0}")]
-    Registry(String),
-    #[error("Storage information unavailable: {0}")]
-    StorageError(String),
-    #[error("GPU information unavailable: {0}")]
-    GpuError(String),
+    #[error("System info error: {0}")]
+    System(String),
+    #[error("NVML error: {0}")]
+    Nvml(String),
 }
 
-// --- Constants for Performance and Maintainability ---
-const BYTES_TO_GB: f64 = 1.0 / 1024.0 / 1024.0 / 1024.0;
-const SECONDS_PER_MINUTE: u64 = 60;
-const SECONDS_PER_HOUR: u64 = 60 * SECONDS_PER_MINUTE;
-const SECONDS_PER_DAY: u64 = 24 * SECONDS_PER_HOUR;
-
-// --- Helper Functions ---
-fn format_uptime(seconds: u64) -> String {
-    let days = seconds / SECONDS_PER_DAY;
-    let hours = (seconds % SECONDS_PER_DAY) / SECONDS_PER_HOUR;
-    let minutes = (seconds % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE;
-    format!("{} days, {} hours, {} min", days, hours, minutes)
-}
-
-#[cfg(target_os = "windows")]
-fn get_windows_specific_info() -> Result<WindowsSpecificInfo, SysInfoError> {
-    use winreg::enums::*;
-    use winreg::RegKey;
-
-    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let current_version_path = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion";
-    let crypto_path = "SOFTWARE\\Microsoft\\Cryptography";
-
-    let current_version = hklm.open_subkey(current_version_path).map_err(|e| {
-        SysInfoError::Registry(format!(
-            "Failed to open key '{}': {}",
-            current_version_path, e
-        ))
-    })?;
-
-    let crypto = hklm.open_subkey(crypto_path).map_err(|e| {
-        SysInfoError::Registry(format!("Failed to open key '{}': {}", crypto_path, e))
-    })?;
-
-    let current_build: String = current_version
-        .get_value("CurrentBuild")
-        .unwrap_or_default();
-    let ubr: u32 = current_version.get_value("UBR").unwrap_or(0);
-
-    Ok(WindowsSpecificInfo {
-        edition: current_version.get_value("ProductName").unwrap_or_default(),
-        full_build_number: format!("{}.{}", current_build, ubr),
-        display_version: current_version
-            .get_value("DisplayVersion")
-            .unwrap_or_default(),
-        install_date_timestamp: current_version.get_value("InstallDate").unwrap_or(0),
-        registered_owner: current_version
-            .get_value("RegisteredOwner")
-            .unwrap_or_default(),
-        registered_organization: current_version
-            .get_value("RegisteredOrganization")
-            .unwrap_or_default(),
-        machine_guid: crypto.get_value("MachineGuid").unwrap_or_default(),
-    })
-}
-
-// --- Public Data Structures (DTOs) ---
-#[derive(Serialize, Clone)]
-pub struct GeneralInfo {
-    os_name: String,
-    kernel_version: String,
-    architecture: String,
-    hostname: String,
-    uptime: String,
-}
-
-#[derive(Serialize, Clone)]
-pub struct WindowsSpecificInfo {
-    edition: String,
-    full_build_number: String,
-    display_version: String,
-    install_date_timestamp: u64,
-    registered_owner: String,
-    registered_organization: String,
-    machine_guid: String,
-}
-
+/// Operating system information
 #[derive(Serialize, Clone)]
 pub struct OperatingSystemInfo {
-    general: GeneralInfo,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    windows_specific: Option<WindowsSpecificInfo>,
+    pub name: String,
+    pub version: String,
+    pub kernel_version: String,
+    pub hostname: String,
+    pub uptime: u64,
 }
 
-/// Contains detailed information about a CPU.
+/// CPU information
 #[derive(Serialize, Clone)]
 pub struct CpuInfo {
-    brand: String,
-    frequency: u64,
-    physical_core_count: u32,
-    logical_core_count: u32,
-    vendor_id: String,
+    pub brand: String,
+    pub frequency: u64,
+    pub physical_cores: usize,
+    pub logical_cores: usize,
 }
 
-/// Contains comprehensive information about a GPU adapter.
-///
-/// This struct provides detailed GPU information collected using the wgpu crate,
-/// including hardware specifications, driver details, and performance characteristics.
-/// All fields are validated during collection to ensure data integrity.
+/// GPU information
 #[derive(Serialize, Clone)]
 pub struct GpuInfo {
-    /// The human-readable name of the GPU (e.g., "NVIDIA GeForce RTX 3060")
-    name: String,
-    /// The driver brand/name (e.g., "NVIDIA", "AMD", "Intel")
-    brand: String,
-    /// The specific driver name and version information
-    driver: String,
-    /// Detailed driver information including version and capabilities
-    driver_info: String,
-    /// The graphics API backend being used (e.g., "DirectX 12", "Vulkan")
-    backend: String,
-    /// The PCI vendor ID (unique identifier for the GPU manufacturer)
-    vendor_id: u32,
-    /// The PCI device ID (unique identifier for the specific GPU model)
-    device_id: u32,
-    /// The type of GPU device (e.g., "Discrete GPU", "Integrated GPU")
-    device_type: String,
+    pub name: String,
+    pub memory_total_mb: Option<u64>,
+    pub memory_used_mb: Option<u64>,
+    pub utilization_percent: Option<u32>,
+    pub temperature_celsius: Option<u32>,
 }
 
-/// Contains detailed information about system memory.
+/// Memory information
 #[derive(Serialize, Clone)]
 pub struct MemoryInfo {
-    total_memory_gb: f64,
-    used_memory_gb: f64,
-    free_memory_gb: f64,
-    available_memory_gb: f64,
-    used_memory_percentage: f32,
+    pub total_mb: u64,
+    pub used_mb: u64,
+    pub free_mb: u64,
 }
 
-/// Contains detailed information about a storage device.
-#[derive(Serialize, Clone)]
-pub struct StorageDeviceInfo {
-    name: String,
-    mount_point: String,
-    file_system: String,
-    total_space_gb: f64,
-    used_space_gb: f64,
-    available_space_gb: f64,
-    used_percentage: f32,
-}
-
-/// Contains detailed information about system storage.
+/// Storage information
 #[derive(Serialize, Clone)]
 pub struct StorageInfo {
-    total_storage_gb: f64,
-    used_storage_gb: f64,
-    available_storage_gb: f64,
-    used_storage_percentage: f32,
-    devices: Vec<StorageDeviceInfo>,
+    pub devices: Vec<StorageDevice>,
 }
 
-/// A composite structure holding all collected system information.
-/// Each field is a Result, allowing for partial success.
+/// Individual storage device information
+#[derive(Serialize, Clone)]
+pub struct StorageDevice {
+    pub name: String,
+    pub total_gb: f64,
+    pub used_gb: f64,
+    pub available_gb: f64,
+}
+
+/// Complete system information
 #[derive(Serialize, Clone)]
 pub struct SystemInfo {
-    os: Result<OperatingSystemInfo, SysInfoError>,
-    cpu: Result<CpuInfo, SysInfoError>,
-    gpu: Result<Vec<GpuInfo>, SysInfoError>,
-    memory: Result<MemoryInfo, SysInfoError>,
-    storage: Result<StorageInfo, SysInfoError>,
+    pub os: Result<OperatingSystemInfo, SysInfoError>,
+    pub cpu: Result<CpuInfo, SysInfoError>,
+    pub gpu: Result<Vec<GpuInfo>, SysInfoError>,
+    pub memory: Result<MemoryInfo, SysInfoError>,
+    pub storage: Result<StorageInfo, SysInfoError>,
 }
 
-// --- Internal Data Collection ---
-fn collect_os_info() -> Result<OperatingSystemInfo, SysInfoError> {
-    let general_os_name = System::name().unwrap_or_else(|| "Unknown OS".to_string());
-    let general_kernel_version;
-    let windows_specific_info;
-
-    #[cfg(target_os = "windows")]
-    {
-        let mut win_specific = get_windows_specific_info()?;
-        win_specific.edition =
-            System::long_os_version().unwrap_or_else(|| win_specific.edition.clone());
-        general_kernel_version = win_specific.full_build_number.clone();
-        windows_specific_info = Some(win_specific);
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        general_kernel_version =
-            System::kernel_version().unwrap_or_else(|| "Unknown kernel".to_string());
-        windows_specific_info = None;
-    }
-
+/// Collect operating system information
+fn get_os_info() -> Result<OperatingSystemInfo, SysInfoError> {
+    let name = System::name().unwrap_or_else(|| "Unknown".to_string());
+    let version = System::os_version().unwrap_or_else(|| "Unknown".to_string());
+    let kernel_version = System::kernel_version().unwrap_or_else(|| "Unknown".to_string());
+    let uptime = System::uptime();
+    println!("[DEBUG] OS Name: {}", name);
+    println!("[DEBUG] OS Version: {}", version);
+    println!("[DEBUG] Kernel Version: {}", kernel_version);
+    println!("[DEBUG] Uptime: {}", uptime);
     Ok(OperatingSystemInfo {
-        general: GeneralInfo {
-            os_name: general_os_name,
-            kernel_version: general_kernel_version,
-            architecture: System::cpu_arch(),
-            hostname: System::host_name().unwrap_or_else(|| "Unknown hostname".to_string()),
-            uptime: format_uptime(System::uptime()),
-        },
-        windows_specific: windows_specific_info,
+        name,
+        version,
+        kernel_version,
+        hostname: "Unknown".to_string(), // Not available in sysinfo 0.35.2
+        uptime,
     })
 }
 
-fn collect_cpu_info() -> Result<CpuInfo, SysInfoError> {
-    let sys =
-        System::new_with_specifics(RefreshKind::nothing().with_cpu(CpuRefreshKind::everything()));
+/// Collect CPU information
+fn get_cpu_info(sys: &System) -> Result<CpuInfo, SysInfoError> {
     let cpus = sys.cpus();
     if cpus.is_empty() {
-        return Err(SysInfoError::NoCpuFound);
+        println!("[DEBUG] No CPUs found");
+        return Err(SysInfoError::System("No CPUs found".to_string()));
     }
     let cpu = &cpus[0];
+    let brand = cpu.brand().to_string();
+    let frequency = cpu.frequency();
+    let physical_cores = System::physical_core_count().unwrap_or(0);
+    let logical_cores = cpus.len();
+    println!("[DEBUG] CPU Brand: {}", brand);
+    println!("[DEBUG] CPU Frequency: {}", frequency);
+    println!("[DEBUG] Physical Cores: {}", physical_cores);
+    println!("[DEBUG] Logical Cores: {}", logical_cores);
     Ok(CpuInfo {
-        brand: cpu.brand().to_string(),
-        frequency: cpu.frequency(),
-        physical_core_count: System::physical_core_count().unwrap_or(0) as u32,
-        logical_core_count: cpus.len() as u32,
-        vendor_id: cpu.vendor_id().to_string(),
+        brand,
+        frequency,
+        physical_cores,
+        logical_cores,
     })
 }
 
-async fn collect_gpu_info() -> Result<Vec<GpuInfo>, SysInfoError> {
-    // Create wgpu instance with proper configuration for system information gathering
-    let descriptor = wgpu::InstanceDescriptor {
-        backends: wgpu::Backends::all(),
-        flags: wgpu::InstanceFlags::default(),
-        backend_options: wgpu::BackendOptions::default(),
-    };
-    let instance = wgpu::Instance::new(&descriptor);
+/// Collect memory information
+fn get_memory_info(sys: &System) -> Result<MemoryInfo, SysInfoError> {
+    let total_mb = sys.total_memory() / 1024;
+    let used_mb = sys.used_memory() / 1024;
+    let free_mb = sys.free_memory() / 1024;
+    println!("[DEBUG] Memory Total: {} MB", total_mb);
+    println!("[DEBUG] Memory Used: {} MB", used_mb);
+    println!("[DEBUG] Memory Free: {} MB", free_mb);
+    Ok(MemoryInfo {
+        total_mb,
+        used_mb,
+        free_mb,
+    })
+}
 
-    // Enumerate adapters with proper error handling
-    let adapters = instance.enumerate_adapters(wgpu::Backends::all());
-
-    if adapters.is_empty() {
-        return Ok(Vec::new()); // No GPUs found is not an error
-    }
-
-    // Process adapters and consolidate by vendor/device ID
-    let mut gpu_map = std::collections::HashMap::<(u32, u32), GpuInfo>::new();
-
-    for adapter in adapters.into_iter() {
-        let info = adapter.get_info();
-
-        // Validate essential GPU information
-        if info.name.is_empty() {
-            continue;
-        }
-
-        // Create a unique key for consolidation
-        let key = (info.vendor, info.device);
-
-        // Extract device type dynamically from wgpu enum
-        let device_type = format!("{:?}", info.device_type);
-
-        // Extract backend information dynamically from wgpu enum
-        let backend = format!("{:?}", info.backend);
-
-        // Extract vendor information dynamically from wgpu
-        // Use the actual driver information provided by the system
-        let vendor_name = if !info.driver.is_empty() {
-            info.driver.clone()
-        } else if !info.driver_info.is_empty() {
-            info.driver_info.clone()
-        } else {
-            // Use a dynamic fallback based on available information
-            if info.vendor != 0 {
-                format!("Vendor_{:X}", info.vendor)
-            } else {
-                "Unknown".to_string()
-            }
-        };
-
-        // Consolidate GPU information
-        if let Some(existing_gpu) = gpu_map.get_mut(&key) {
-            // Add backend to existing GPU if not already present
-            if !existing_gpu.backend.contains(&backend) {
-                if existing_gpu.backend == "Unknown" {
-                    existing_gpu.backend = backend;
-                } else {
-                    existing_gpu.backend = format!("{}, {}", existing_gpu.backend, backend);
-                }
-            }
-
-            // Use better driver info if available
-            if (existing_gpu.driver_info == "Unavailable" || existing_gpu.driver_info.is_empty())
-                && info.driver_info != "Unavailable"
-                && !info.driver_info.is_empty()
-            {
-                existing_gpu.driver_info = info.driver_info.clone();
-            }
-
-            // Use better driver name if available
-            if (existing_gpu.driver == "Unavailable" || existing_gpu.driver.is_empty())
-                && info.driver != "Unavailable"
-                && !info.driver.is_empty()
-            {
-                existing_gpu.driver = info.driver.clone();
-            }
-        } else {
-            // Create new GPU entry
-            gpu_map.insert(
-                key,
-                GpuInfo {
-                    name: info.name,
-                    brand: vendor_name,
-                    driver: info.driver,
-                    driver_info: info.driver_info,
-                    backend,
-                    vendor_id: info.vendor,
-                    device_id: info.device,
-                    device_type,
-                },
+/// Collect storage information
+fn get_storage_info() -> Result<StorageInfo, SysInfoError> {
+    let disks = Disks::new_with_refreshed_list();
+    println!("[DEBUG] Disks found: {}", disks.list().len());
+    let devices = disks
+        .list()
+        .iter()
+        .map(|disk| {
+            let total = disk.total_space() as f64 / GB_IN_BYTES;
+            let available = disk.available_space() as f64 / GB_IN_BYTES;
+            let used = total - available;
+            println!(
+                "[DEBUG] Disk: {} | Total: {:.2} GB | Used: {:.2} GB | Available: {:.2} GB",
+                disk.name().to_string_lossy(),
+                total,
+                used,
+                available
             );
-        }
-    }
-
-    // Convert to vector and sort by device type dynamically
-    let mut gpus: Vec<GpuInfo> = gpu_map.into_values().collect();
-    gpus.sort_by(|a, b| {
-        // Dynamic sorting based on device type enum order
-        let type_order = |device_type: &str| {
-            // Use the actual enum order from wgpu for consistent sorting
-            match device_type {
-                "DiscreteGpu" => 0,
-                "IntegratedGpu" => 1,
-                "VirtualGpu" => 2,
-                "Cpu" => 3,
-                _ => 4,
+            StorageDevice {
+                name: disk.name().to_string_lossy().to_string(),
+                total_gb: total,
+                used_gb: used,
+                available_gb: available,
             }
-        };
-        type_order(&a.device_type).cmp(&type_order(&b.device_type))
-    });
+        })
+        .collect();
+    Ok(StorageInfo { devices })
+}
 
+/// Collect GPU information using NVIDIA Management Library
+fn get_gpu_info() -> Result<Vec<GpuInfo>, SysInfoError> {
+    let nvml = Nvml::init().map_err(|e| SysInfoError::Nvml(e.to_string()))?;
+    let count = nvml
+        .device_count()
+        .map_err(|e| SysInfoError::Nvml(e.to_string()))?;
+    println!("[DEBUG] NVML GPU count: {}", count);
+    let mut gpus = Vec::new();
+    for i in 0..count {
+        let device = nvml
+            .device_by_index(i)
+            .map_err(|e| SysInfoError::Nvml(e.to_string()))?;
+        let name = device.name().unwrap_or_else(|_| "Unknown GPU".to_string());
+        let memory = device.memory_info().ok();
+        let utilization = device.utilization_rates().ok().map(|u| u.gpu);
+        let temperature = device
+            .temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu)
+            .ok();
+        println!(
+            "[DEBUG] GPU {}: {} | Mem: {:?} | Util: {:?} | Temp: {:?}",
+            i, name, memory, utilization, temperature
+        );
+        gpus.push(GpuInfo {
+            name,
+            memory_total_mb: memory.as_ref().map(|m| m.total / MB_IN_BYTES),
+            memory_used_mb: memory.as_ref().map(|m| m.used / MB_IN_BYTES),
+            utilization_percent: utilization,
+            temperature_celsius: temperature,
+        });
+    }
     Ok(gpus)
 }
 
-fn collect_memory_info() -> Result<MemoryInfo, SysInfoError> {
-    let mut sys = System::new();
-    sys.refresh_memory();
-    let total = sys.total_memory();
-    let used = sys.used_memory();
-    let used_percentage = if total > 0 {
-        (used as f32 / total as f32) * 100.0
-    } else {
-        0.0
-    };
-    Ok(MemoryInfo {
-        total_memory_gb: total as f64 * BYTES_TO_GB,
-        used_memory_gb: used as f64 * BYTES_TO_GB,
-        free_memory_gb: sys.free_memory() as f64 * BYTES_TO_GB,
-        available_memory_gb: sys.available_memory() as f64 * BYTES_TO_GB,
-        used_memory_percentage: used_percentage,
-    })
-}
-
-fn collect_storage_info() -> Result<StorageInfo, SysInfoError> {
-    let disks = Disks::new_with_refreshed_list();
-    let mut devices = Vec::new();
-    for disk in disks.list() {
-        let total_space = disk.total_space();
-        let available_space = disk.available_space();
-        let used_space = total_space.saturating_sub(available_space);
-        let used_percentage = if total_space > 0 {
-            (used_space as f32 / total_space as f32) * 100.0
-        } else {
-            0.0
-        };
-        devices.push(StorageDeviceInfo {
-            name: disk.name().to_string_lossy().into_owned(),
-            mount_point: disk.mount_point().to_string_lossy().into_owned(),
-            file_system: disk.file_system().to_string_lossy().into_owned(),
-            total_space_gb: total_space as f64 * BYTES_TO_GB,
-            used_space_gb: used_space as f64 * BYTES_TO_GB,
-            available_space_gb: available_space as f64 * BYTES_TO_GB,
-            used_percentage,
-        });
-    }
-
-    let total_storage_gb: f64 = devices.iter().map(|d| d.total_space_gb).sum();
-    let used_storage_gb: f64 = devices.iter().map(|d| d.used_space_gb).sum();
-    let used_storage_percentage = if total_storage_gb > 0.0 {
-        (used_storage_gb / total_storage_gb * 100.0) as f32
-    } else {
-        0.0
-    };
-
-    Ok(StorageInfo {
-        total_storage_gb,
-        used_storage_gb,
-        available_storage_gb: devices.iter().map(|d| d.available_space_gb).sum(),
-        used_storage_percentage,
-        devices,
-    })
-}
-
-// --- Main Public Function ---
-
+/// Tauri command to get complete system information
 #[tauri::command]
 pub async fn get_system_info() -> SystemInfo {
+    let mut sys = System::new_all();
+    sys.refresh_all();
     SystemInfo {
-        os: collect_os_info(),
-        cpu: collect_cpu_info(),
-        gpu: collect_gpu_info().await,
-        memory: collect_memory_info(),
-        storage: collect_storage_info(),
+        os: get_os_info(),
+        cpu: get_cpu_info(&sys),
+        gpu: get_gpu_info(),
+        memory: get_memory_info(&sys),
+        storage: get_storage_info(),
     }
 }
